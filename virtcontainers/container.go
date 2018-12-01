@@ -694,6 +694,7 @@ func createContainer(sandbox *Sandbox, contConfig ContainerConfig) (c *Container
 		return nil, errNeedSandbox
 	}
 
+	//create container structures
 	c, err = newContainer(sandbox, contConfig)
 	if err != nil {
 		return
@@ -725,6 +726,11 @@ func createContainer(sandbox *Sandbox, contConfig ContainerConfig) (c *Container
 				return
 			}
 		} else {
+			//We should maybe rename hotplugDrive and add some
+			//capability logic into it.  In the meantime, let's
+			// just hack what we need for this coldplug path and
+			// duplicate much of the prior logic
+
 			//code plug path for block
 		}
 	}
@@ -1081,6 +1087,72 @@ func (c *Container) resume() error {
 	}
 
 	return c.setContainerState(StateRunning)
+}
+
+//
+// FC-hacking: do we need to make use of device manager? This
+// function simply gets the minimum information it needs to be
+// prepare a call to firecracker.
+//
+func (c *Container) coldplugDrive() error {
+	dev, err := getDeviceForPath(c.rootFs)
+
+	if err == errMountPointNotFound {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	c.Logger().WithFields(logrus.Fields{
+		"device-major": dev.major,
+		"device-minor": dev.minor,
+		"mount-point":  dev.mountPoint,
+	}).Info("device details")
+
+	isDM, err := checkStorageDriver(dev.major, dev.minor)
+	if err != nil {
+		return err
+	}
+
+	if !isDM {
+		return nil
+	}
+
+	// If device mapper device, then fetch the full path of the device
+	devicePath, fsType, err := getDevicePathAndFsType(dev.mountPoint)
+	if err != nil {
+		return err
+	}
+
+	devicePath, err = filepath.EvalSymlinks(devicePath)
+	if err != nil {
+		return err
+	}
+
+	c.Logger().WithFields(logrus.Fields{
+		"device-path": devicePath,
+		"fs-type":     fsType,
+	}).Info("Block device detected")
+
+	var stat unix.Stat_t
+	if err := unix.Stat(devicePath, &stat); err != nil {
+		return fmt.Errorf("stat %q failed: %v", devicePath, err)
+	}
+
+	//
+	// I think that's all we really need in order to attach the device
+	// in the cold plug case
+	//
+	// swagger need:
+	//	drive_id: string
+	//   	path_on_host: string
+	//	is_root_device: bool
+	//	is_read_only: bool
+	// I think we'd pass in { foo, devicePath, false, false } ?
+
+	return nil
 }
 
 func (c *Container) hotplugDrive() error {

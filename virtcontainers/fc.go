@@ -35,20 +35,11 @@ type firecracker struct {
 	ctx context.Context
 }
 
-// agnostic list of kernel parameters
-var defaultKernelParameters = []Param{
-	{"panic", "1"},
-}
-
 type operation int
 
 // Logger returns a logrus logger appropriate for logging qemu messages
 func (fc *firecracker) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "qemu")
-}
-
-func (fc *firecracker) hypervisorConfig() HypervisorConfig {
-	return fc.config
 }
 
 func (fc *firecracker) trace(name string) (opentracing.Span, context.Context) {
@@ -157,37 +148,11 @@ func (fc *firecracker) stopSandbox() error {
 	return nil
 }
 
-func (fc *firecracker) hotplugBlockDevice(drive *config.BlockDrive, op operation) error {}
-
-func (fc *firecracker) hotplugDevice(devInfo interface{}, devType deviceType, op operation) (interface{}, error) {
-	switch devType {
-	case blockDev:
-		drive := devInfo.(*config.BlockDrive)
-		return nil, q.hotplugBlockDevice(drive, op)
-	case cpuDev:
-		vcpus := devInfo.(uint32)
-		return q.hotplugCPUs(vcpus, op)
-	case memoryDev:
-		memdev := devInfo.(*memoryDevice)
-		return q.hotplugMemory(memdev, op)
-	case netDev:
-		device := devInfo.(Endpoint)
-		return nil, q.hotplugNetDevice(device, op)
-	default:
-		return nil, fmt.Errorf("cannot hotplug device: unsupported device type '%v'", devType)
-	}
-}
-
-func (fc *firecracker) hotplugAddDevice(devInfo interface{}, devType deviceType) (interface{}, error) {
-	span, _ := q.trace("hotplugAddDevice")
-	defer span.Finish()
-
-	return nil, nil
-}
-
-func (fc *firecracker) hotplugRemoveDevice(devInfo interface{}, devType deviceType) (interface{}, error)
-
 func (fc *firecracker) pauseSandbox() error {
+	return nil
+}
+
+func (fc *firecracker) saveSandbox() error {
 	return nil
 }
 
@@ -195,19 +160,71 @@ func (fc *firecracker) resumeSandbox() error {
 	return nil
 }
 
-// addDevice will add extra devices to Qemu command line.
-func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error {
+func (fc *firecracker) fcAddNetDevice(endpoint Endpoint) error {
+	guest_mac := endpoint.HardwareAddr()
+	iface_id := endpoint.Name()
+	host_dev_name := iface_id
+
+	//
+	// call rest API: {iface_id, guest_mac (endpoint.HardwareAddr(), host_dev_name(?)
+	//
+
 	return nil
+}
+
+func (fc *firecracker) fcAddBlockDrive(drive config.BlockDrive) error {
+	drive_id := config.BlockDrive.ID
+	path_on_host := config.BlockDrive.File
+	is_root_device := false
+	is_read_only := false
+
+	//
+	// call rest API
+	//
+
+	return nil
+}
+
+// addDevice will add extra devices to firecracker.  Limited to configure before the
+// virtual machine starts.  Devices include drivers and network interfaces only.
+func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error {
+	span, _ := fc.trace("addDevice")
+	defer span.Finish()
+
+	switch v := devInfo.(type) {
+	case Endpoint:
+		fcAddNetDevice(v)
+	case config.BlockDrive:
+		fcAddBlockDrive(v)
+	default:
+		break
+	}
+
+	return nil
+}
+
+// hotplugAddDevice not supported in Firecracker VMM
+func (fc *firecracker) hotplugAddDevice(devInfo interface{}, devType deviceType) (interface{}, error) {
+	return nil, fmt.Errorf("firecracker does not support device hotplug")
+}
+
+// hotplugRemoveDevice not supported in Firecracker VMM
+func (fc *firecracker) hotplugRemoveDevice(devInfo interface{}, devType deviceType) (interface{}, error) {
+	return nil, fmt.Errorf("firecracker does not support device hotplug")
 }
 
 // getSandboxConsole builds the path of the console where we can read
 // logs coming from the sandbox.
+//
+// we can get logs from firecracker itself; WIP on enabling.  Who needs
+// logs when you're just hacking?
 func (fc *firecracker) getSandboxConsole(id string) (string, error) {
-	return nil
+	return nil, nil
 }
 
-func (fc *firecracker) saveSandbox() error {
-	return nil
+func (fc *firecracker) disconnect() {
+	// not sure if this is really necessary, at least in the first pass
+	return
 }
 
 // Adds all capabilities supported by firecracker implementation of hypervisor interface
@@ -216,5 +233,22 @@ func (fc *firecracker) capabilities() capabilities {
 	defer span.Finish()
 	var caps capabilities
 	caps.set9pUnsupported()
+
 	return caps
+}
+
+func (fc *firecracker) hypervisorConfig() HypervisorConfig {
+	return fc.config
+}
+
+// this is used to apply cgroup information on the host. not sure how necessary this
+// is in the first pass.
+//
+// Need to see if there's an easy way to ask firecracker for thread ids associated with
+// the vCPUs.  Issue opened to ask for per vCPU thread IDs:
+//			https://github.com/firecracker-microvm/firecracker/issues/718
+func (fc *firecracker) getThreadIDs() (*threadIDs, error) {
+	//TODO: this may not be exactly supported in Firecracker. Closest is cpu-template as part
+	// of get /machine-config
+	return nil, nil
 }

@@ -573,6 +573,12 @@ func (s *Sandbox) GetContainer(containerID string) VCContainer {
 	return nil
 }
 
+//
+// TODO: FC-Hacking: this has an assumption that VM and agent are already
+// started at sandbox creation time.  This won't be the case in firecracker.
+//   .....let's see what happens.... - may want to track 'state' of the agent
+// and noop the agent disconnect if it isn't started yet?
+//
 // Release closes the agent connection and removes sandbox from internal list.
 func (s *Sandbox) Release() error {
 	s.Logger().Info("release sandbox")
