@@ -86,26 +86,24 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		}
 	}()
 
-	// Start the VM
-	if err = s.startVM(); err != nil {
+	// Start the hypervisor.  If we are dealing with a hypervisor that supports hotplug,
+	// we will start the actual virtual machine at this point. In the case of firecracker,
+	// just the hypervisor process is started
+	if err = s.startHypervisor(); err != nil {
 		return nil, err
 	}
 
-	// rollback to stop VM if error occurs
+	// rollback to stop the hypervisor if an error occurs
 	defer func() {
 		if err != nil {
 			s.stopVM()
 		}
 	}()
 
-	//
-	// TODO : : yo, let's not actually do this! In case
-	// we aren't using hotplug, we should only start QEMU
-	// after we have all of the container details, in probably
-	// not until we receive a start command.
-	//
 	hypervisorCaps := s.hypervisor.capabilities()
 
+	//In the event that hotplug is supported, go ahead and start the agent sandbox
+	// and create the containers.
 	if hypervisorCaps.isHotplugSupported() {
 		// Once startVM is done, we want to guarantee
 		// that the sandbox is manageable. For that we need
@@ -131,6 +129,8 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 	// use it to prerpare the hypervisor, but not actually create the container
 	// in the guest (guest should not be started at this time)
 	//
+	//TODO: Should we be calling s.CreateContainer here, since the
+	//sandbox will only ever be created with a single container to start?
 	if err = s.createContainers(); err != nil {
 		return nil, err
 	}

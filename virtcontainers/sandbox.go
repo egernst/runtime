@@ -1183,14 +1183,12 @@ func (s *Sandbox) ListRoutes() ([]*types.Route, error) {
 	return s.agent.listRoutes()
 }
 
-// startVM starts the VM.
-// TODO: We should rename this from startVM to startHypervisor, since
-// that covers the scenarios more accurately
-func (s *Sandbox) startVM() error {
-	span, ctx := s.trace("startVM")
+// startHypervisor starts the hypervisor
+func (s *Sandbox) startHypervisor() error {
+	span, ctx := s.trace("startHypervisor")
 	defer span.Finish()
 
-	s.Logger().Info("Starting VM")
+	s.Logger().Info("Starting hypervisor")
 
 	if err := s.network.run(s.networkNS.NetNsPath, func() error {
 		if s.factory != nil {
@@ -1496,7 +1494,8 @@ func (s *Sandbox) ResumeContainer(containerID string) error {
 	return c.resume()
 }
 
-// FC-HACKING - TODO: the comment below is wrong.  Similarly, if the hypervisor
+// FC-HACKING - TODO: the comment below is wrong - proxy isn't necessarily here...
+//.  Similarly, if the hypervisor
 // does not support hotplug, we'll want to *just* gather information about the
 // container rather than actually creating it (creation will happen in "start" phase
 

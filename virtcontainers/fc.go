@@ -187,25 +187,34 @@ func (fc *firecracker) hotplugAddDevice(devInfo interface{}, devType deviceType)
 
 func (fc *firecracker) hotplugRemoveDevice(devInfo interface{}, devType deviceType) (interface{}, error)
 
-func (fc *firecracker) pauseSandbox() error
+func (fc *firecracker) pauseSandbox() error {
+	return nil
+}
 
-func (fc *firecracker) resumeSandbox() error {}
+func (fc *firecracker) resumeSandbox() error {
+	return nil
+}
 
 // addDevice will add extra devices to Qemu command line.
-func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error {}
+func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error {
+	return nil
+}
 
 // getSandboxConsole builds the path of the console where we can read
 // logs coming from the sandbox.
-func (fc *firecracker) getSandboxConsole(id string) (string, error)
+func (fc *firecracker) getSandboxConsole(id string) (string, error) {
+	return nil
+}
 
 func (fc *firecracker) saveSandbox() error {
+	return nil
+}
 
 // Adds all capabilities supported by firecracker implementation of hypervisor interface
 func (fc *firecracker) capabilities() capabilities {
 	span, _ := fc.trace("capabilities")
 	defer span.Finish()
-	return capabilities{}
-}
-
-
+	var caps capabilities
+	caps.set9pUnsupported()
+	return caps
 }
