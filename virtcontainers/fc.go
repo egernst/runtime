@@ -35,8 +35,6 @@ type firecracker struct {
 	ctx context.Context
 }
 
-type operation int
-
 // Logger returns a logrus logger appropriate for logging qemu messages
 func (fc *firecracker) Logger() *logrus.Entry {
 	return virtLog.WithField("subsystem", "qemu")
