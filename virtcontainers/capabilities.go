@@ -8,6 +8,7 @@ package virtcontainers
 const (
 	blockDeviceSupport = 1 << iota
 	blockDeviceHotplugSupport
+	hotplugSupport
 )
 
 type capabilities struct {
@@ -34,4 +35,15 @@ func (caps *capabilities) isBlockDeviceHotplugSupported() bool {
 
 func (caps *capabilities) setBlockDeviceHotplugSupport() {
 	caps.flags |= blockDeviceHotplugSupport
+}
+
+func (caps *capabilities) isHotplugSupported() bool {
+	if caps.flags&hotplugSupport != 0 {
+		return true
+	}
+	return false
+}
+
+func (caps *capabilities) setHotplugSupport() {
+	caps.flags |= hotplugSupport
 }

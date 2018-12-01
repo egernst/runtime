@@ -674,9 +674,17 @@ func (c *Container) checkBlockDeviceSupport() bool {
 		agentCaps := c.sandbox.agent.capabilities()
 		hypervisorCaps := c.sandbox.hypervisor.capabilities()
 
+		//FC-hacking: TODO: this logic should be updated.  one of the
+		// capabilites we should track for the hypervisor is whether hotplug
+		// itself is supported. In case of firecracker, hotplug does not exist,
+		// and the flow will be different such that we want to plug the device
+		// into the hypervisor, and it'll be used as a 'coldplug' once the virtual
+		// machine itself starts
 		if agentCaps.isBlockDeviceSupported() && hypervisorCaps.isBlockDeviceHotplugSupported() {
 			return true
 		}
+
+		if  
 	}
 
 	return false
@@ -706,6 +714,12 @@ func createContainer(sandbox *Sandbox, contConfig ContainerConfig) (c *Container
 		}
 	}()
 
+	//
+	// TODO: The following function has gaps; it is assuming that
+	// block device usage is tied to hotplug support, which is no longer
+	// the case.  For FC hacking, we *know* that block device support is
+	// available, and is the only option.
+	//
 	if c.checkBlockDeviceSupport() {
 		if err = c.hotplugDrive(); err != nil {
 			return
