@@ -98,6 +98,10 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 		}
 	}()
 
+	//
+	// TODO : : yo, let's not actually do this!
+	//
+
 	// Once startVM is done, we want to guarantee
 	// that the sandbox is manageable. For that we need
 	// to start the sandbox inside the VM.

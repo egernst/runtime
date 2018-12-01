@@ -22,6 +22,9 @@ const (
 	// QemuHypervisor is the QEMU hypervisor.
 	QemuHypervisor HypervisorType = "qemu"
 
+	// FirecrackerHypervisor is the firecracker hypervisor.
+	FirecrackerHypervisor HypervisorType = "firecracker"
+
 	// MockHypervisor is a mock hypervisor for testing purposes
 	MockHypervisor HypervisorType = "mock"
 )
@@ -116,11 +119,13 @@ func (hType *HypervisorType) String() string {
 	}
 }
 
-// newHypervisor returns an hypervisor from and hypervisor type.
+// newHypervisor returns a new hypervisor  type.
 func newHypervisor(hType HypervisorType) (hypervisor, error) {
 	switch hType {
 	case QemuHypervisor:
 		return &qemu{}, nil
+	case FirecrackerHypervisor:
+		return &firecracker{}, nil
 	case MockHypervisor:
 		return &mockHypervisor{}, nil
 	default:
@@ -277,6 +282,10 @@ func (conf *HypervisorConfig) checkTemplateConfig() error {
 	return nil
 }
 
+//
+// FC-hacking TODO: this function is very QEMU specific, and should be
+// moved elsewhere.
+//
 func (conf *HypervisorConfig) valid() error {
 	if conf.KernelPath == "" {
 		return fmt.Errorf("Missing kernel path")

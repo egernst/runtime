@@ -391,8 +391,9 @@ func (spec *CompatOCISpec) ContainerType() (vc.ContainerType, error) {
 			continue
 		}
 
-		for _, t := range CRIContainerTypeList {
+		for x, t := range CRIContainerTypeList {
 			if t.annotation == containerTypeVal {
+				ociLog.Infof("containerType: raw: %s, annotation: %s", x, t.annotation)
 				return t.containerType, nil
 			}
 
@@ -401,6 +402,7 @@ func (spec *CompatOCISpec) ContainerType() (vc.ContainerType, error) {
 		return vc.UnknownContainerType, fmt.Errorf("Unknown container type %s", containerTypeVal)
 	}
 
+	ociLog.Infof("containerType: no annotation provided: must be docker")
 	return vc.PodSandbox, nil
 }
 

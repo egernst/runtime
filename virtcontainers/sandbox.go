@@ -743,8 +743,9 @@ func (s *Sandbox) getAndStoreGuestDetails() error {
 // createSandbox creates a sandbox from a sandbox description, the containers list, the hypervisor
 // and the agent passed through the Config structure.
 // It will create and store the sandbox structure, and then ask the hypervisor
-// to physically create that sandbox i.e. starts a VM for that sandbox to eventually
-// be started.
+// to create that sandbox.  This will start a hypervisor which will manage the VM the sandbox
+// will ultimately be run in.  Depending on the hypervisor, this may just start creation of the VM rather
+// than actually running the VM.
 func createSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factory) (*Sandbox, error) {
 	span, ctx := trace(ctx, "createSandbox")
 	defer span.Finish()
@@ -852,10 +853,17 @@ func newSandbox(ctx context.Context, sandboxConfig SandboxConfig, factory Factor
 		}
 	}()
 
+	//
+	// init will just setup the hypervisor specific data structures -
+	//  nothing as actually being done here
+	//
 	if err = s.hypervisor.init(ctx, s.id, &sandboxConfig.HypervisorConfig, s.storage); err != nil {
 		return nil, err
 	}
 
+	//
+	// create sandbox - more of the same
+	//
 	if err = s.hypervisor.createSandbox(); err != nil {
 		return nil, err
 	}
@@ -1176,6 +1184,8 @@ func (s *Sandbox) ListRoutes() ([]*types.Route, error) {
 }
 
 // startVM starts the VM.
+// TODO: We should rename this from startVM to startHypervisor, since
+// that covers the scenarios more accurately
 func (s *Sandbox) startVM() error {
 	span, ctx := s.trace("startVM")
 	defer span.Finish()
@@ -1228,8 +1238,7 @@ func (s *Sandbox) startVM() error {
 		}
 	}
 
-	// Store the network
-	s.Logger().Info("VM started")
+	s.Logger().Info("Hypervisor started")
 
 	return nil
 }
