@@ -1496,6 +1496,10 @@ func (s *Sandbox) ResumeContainer(containerID string) error {
 	return c.resume()
 }
 
+// FC-HACKING - TODO: the comment below is wrong.  Similarly, if the hypervisor
+// does not support hotplug, we'll want to *just* gather information about the
+// container rather than actually creating it (creation will happen in "start" phase
+
 // createContainers registers all containers to the proxy, create the
 // containers in the guest and starts one shim per container.
 func (s *Sandbox) createContainers() error {

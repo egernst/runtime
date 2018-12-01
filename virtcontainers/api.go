@@ -104,8 +104,9 @@ func createSandboxFromConfig(ctx context.Context, sandboxConfig SandboxConfig, f
 	// after we have all of the container details, in probably
 	// not until we receive a start command.
 	//
-	if nil == nil {
+	hypervisorCaps := s.hypervisor.capabilities()
 
+	if hypervisorCaps.isHotplugSupported() {
 		// Once startVM is done, we want to guarantee
 		// that the sandbox is manageable. For that we need
 		// to start the sandbox inside the VM.
