@@ -226,6 +226,7 @@ func (q *qemuArchBase) kernelParameters(debug bool) []Param {
 
 func (q *qemuArchBase) capabilities() capabilities {
 	var caps capabilities
+	caps.setHotplugSupport()
 	caps.setBlockDeviceHotplugSupport()
 	return caps
 }

@@ -684,7 +684,6 @@ func (c *Container) checkBlockDeviceSupport() bool {
 			return true
 		}
 
-		if  
 	}
 
 	return false

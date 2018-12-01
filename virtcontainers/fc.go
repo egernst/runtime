@@ -199,4 +199,13 @@ func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error 
 func (fc *firecracker) getSandboxConsole(id string) (string, error)
 
 func (fc *firecracker) saveSandbox() error {
+
+// Adds all capabilities supported by firecracker implementation of hypervisor interface
+func (fc *firecracker) capabilities() capabilities {
+	span, _ := fc.trace("capabilities")
+	defer span.Finish()
+	return capabilities{}
+}
+
+
 }

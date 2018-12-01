@@ -91,6 +91,7 @@ func (q *qemuPPC64le) capabilities() capabilities {
 
 	// pseries machine type supports hotplugging drives
 	if q.machineType == QemuPseries {
+		caps.setHotplugSupport()
 		caps.setBlockDeviceHotplugSupport()
 	}
 
