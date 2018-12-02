@@ -721,7 +721,7 @@ func createContainer(sandbox *Sandbox, contConfig ContainerConfig) (c *Container
 
 	if c.checkBlockDeviceSupport() {
 		hypervisorCaps := c.sandbox.hypervisor.capabilities()
-		if hypervisorCaps.isBlockDeviceHotplugSupport() {
+		if hypervisorCaps.isBlockDeviceHotplugSupported() {
 			if err = c.hotplugDrive(); err != nil {
 				return
 			}

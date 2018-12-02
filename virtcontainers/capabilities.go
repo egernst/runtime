@@ -7,8 +7,8 @@ package virtcontainers
 
 const (
 	blockDeviceSupport = 1 << iota
-	blockDeviceHotplugSupport,
-	hotplugSupport,
+	blockDeviceHotplugSupport
+	hotplugSupport
 	plan9FSUnsupported
 )
 

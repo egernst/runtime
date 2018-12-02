@@ -8,21 +8,21 @@ package virtcontainers
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strconv"
+	//"os"
+	//"path/filepath"
+	//"strconv"
 	"strings"
 	"time"
 
-	"github.com/kata-containers/runtime/virtcontainers/pkg/uuid"
+	//"github.com/kata-containers/runtime/virtcontainers/pkg/uuid"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/kata-containers/runtime/virtcontainers/device/config"
-	"github.com/kata-containers/runtime/virtcontainers/utils"
+	//"github.com/kata-containers/runtime/virtcontainers/utils"
 )
 
-// qemu is an Hypervisor interface implementation for the Linux qemu hypervisor.
+// firecracker is an Hypervisor interface implementation for the firecracker hypervisor.
 type firecracker struct {
 	id string
 
@@ -30,26 +30,24 @@ type firecracker struct {
 
 	config HypervisorConfig
 
-	state fcState
-
 	ctx context.Context
 }
 
-// Logger returns a logrus logger appropriate for logging qemu messages
+// Logger returns a logrus logger appropriate for logging firecracker  messages
 func (fc *firecracker) Logger() *logrus.Entry {
-	return virtLog.WithField("subsystem", "qemu")
+	return virtLog.WithField("subsystem", "firecracker")
 }
 
 func (fc *firecracker) trace(name string) (opentracing.Span, context.Context) {
-	if q.ctx == nil {
-		q.Logger().WithField("type", "bug").Error("trace called before context set")
-		q.ctx = context.Background()
+	if fc.ctx == nil {
+		fc.Logger().WithField("type", "bug").Error("trace called before context set")
+		fc.ctx = context.Background()
 	}
 
-	span, ctx := opentracing.StartSpanFromContext(q.ctx, name)
+	span, ctx := opentracing.StartSpanFromContext(fc.ctx, name)
 
 	span.SetTag("subsystem", "hypervisor")
-	span.SetTag("type", "qemu")
+	span.SetTag("type", "firecracker")
 
 	return span, ctx
 }
@@ -75,19 +73,34 @@ func (fc *firecracker) init(ctx context.Context, id string, hypervisorConfig *Hy
 	return nil
 }
 
+// for firecracker this call isn't necessary
 func (fc *firecracker) createSandbox() error {
 	span, _ := fc.trace("createSandbox")
 	defer span.Finish()
 
-	kernelPath, err := fc.config.KernelAssetPath()
-	if err != nil {
-		return err
-	}
+	return nil
+}
 
-	initrdPath, err := fc.config.InitrdAssetPath()
-	if err != nil {
-		return err
-	}
+func (fc *firecracker) fcSetBootSource(path, params string) error {
+	fc.Logger().WithField("kernel path:", path).Debug()
+	fc.Logger().WithField("kernel params:", params).Debug()
+
+	//
+	// call rest API here
+	//
+
+	return nil
+}
+func (fc *firecracker) fcSetVMRootfs(path string) error {
+	fc.Logger().WithField("VM rootfs path:", path).Debug()
+
+	//var ro string
+	//var root string
+	//var drive_id string
+
+	//
+	// call rest API here
+	//
 
 	return nil
 }
@@ -96,27 +109,54 @@ func (fc *firecracker) createSandbox() error {
 // In the context of firecracker, this will start the hypervisor,
 // for configuration, but not yet start the actual virtual machine
 func (fc *firecracker) startSandbox() error {
-	span, _ := q.trace("startSandbox")
+	span, _ := fc.trace("startSandbox")
 	defer span.Finish()
 
 	//
 	// call script to start firecracker process with a unique name
 	//  provided by fc.id ? I hope that is unique...
 
-	//TODO
+	//
+
+	kernelPath, err := fc.config.KernelAssetPath()
+	if err != nil {
+		return err
+	}
+
+	strParams := SerializeParams(fc.config.KernelParams, "=")
+	formattedParams := strings.Join(strParams, " ")
+
+	fc.fcSetBootSource(kernelPath, formattedParams)
+
+	image, err := fc.config.InitrdAssetPath()
+	if err != nil {
+		return err
+	}
+
+	if image == "" {
+		image, err = fc.config.ImageAssetPath()
+		if err != nil {
+			return err
+		}
+		//how to handle this error...
+	}
+
+	fc.fcSetVMRootfs(image)
 
 	return nil
 }
 
 // waitSandbox will wait for the Sandbox's VM to be up and running.
 func (fc *firecracker) waitSandbox(timeout int) error {
-	span, _ := q.trace("waitSandbox")
+	span, _ := fc.trace("waitSandbox")
 	defer span.Finish()
 
 	if timeout < 0 {
 		return fmt.Errorf("Invalid timeout %ds", timeout)
 	}
 
+	var err error
+	timeStart := time.Now()
 	for {
 		//
 		// check to see if there's an instance of firecracker
@@ -138,10 +178,10 @@ func (fc *firecracker) waitSandbox(timeout int) error {
 
 // stopSandbox will stop the Sandbox's VM.
 func (fc *firecracker) stopSandbox() error {
-	span, _ := q.trace("stopSandbox")
+	span, _ := fc.trace("stopSandbox")
 	defer span.Finish()
 
-	q.Logger().Info("Stopping Sandbox")
+	fc.Logger().Info("Stopping Sandbox")
 
 	return nil
 }
@@ -159,9 +199,9 @@ func (fc *firecracker) resumeSandbox() error {
 }
 
 func (fc *firecracker) fcAddNetDevice(endpoint Endpoint) error {
-	guest_mac := endpoint.HardwareAddr()
-	iface_id := endpoint.Name()
-	host_dev_name := iface_id
+	//guest_mac := endpoint.HardwareAddr()
+	//iface_id := endpoint.Name()
+	//host_dev_name := iface_id
 
 	//
 	// call rest API: {iface_id, guest_mac (endpoint.HardwareAddr(), host_dev_name(?)
@@ -171,10 +211,10 @@ func (fc *firecracker) fcAddNetDevice(endpoint Endpoint) error {
 }
 
 func (fc *firecracker) fcAddBlockDrive(drive config.BlockDrive) error {
-	drive_id := config.BlockDrive.ID
-	path_on_host := config.BlockDrive.File
-	is_root_device := false
-	is_read_only := false
+	//drive_id := config.BlockDrive.ID
+	//path_on_host := config.BlockDrive.File
+	//is_root_device := false
+	//is_read_only := false
 
 	//
 	// call rest API
@@ -191,9 +231,9 @@ func (fc *firecracker) addDevice(devInfo interface{}, devType deviceType) error 
 
 	switch v := devInfo.(type) {
 	case Endpoint:
-		fcAddNetDevice(v)
+		return fc.fcAddNetDevice(v)
 	case config.BlockDrive:
-		fcAddBlockDrive(v)
+		return fc.fcAddBlockDrive(v)
 	default:
 		break
 	}
@@ -217,7 +257,7 @@ func (fc *firecracker) hotplugRemoveDevice(devInfo interface{}, devType deviceTy
 // we can get logs from firecracker itself; WIP on enabling.  Who needs
 // logs when you're just hacking?
 func (fc *firecracker) getSandboxConsole(id string) (string, error) {
-	return nil, nil
+	return "", nil
 }
 
 func (fc *firecracker) disconnect() {
