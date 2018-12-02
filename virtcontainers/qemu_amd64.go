@@ -105,7 +105,6 @@ func (q *qemuAmd64) capabilities() capabilities {
 	if q.machineType == QemuPC ||
 		q.machineType == QemuQ35 ||
 		q.machineType == QemuVirt {
-		caps.setHotplugSupport()
 		caps.setBlockDeviceHotplugSupport()
 	}
 
