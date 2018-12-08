@@ -458,15 +458,10 @@ func (c *Container) mountSharedDirMounts(hostSharedDir, guestSharedDir string) (
 		// Check if mount is a block device file. If it is, the block device will be attached to the host
 		// instead of passing this as a shared mount.
 		if len(m.BlockDeviceID) > 0 {
-			// Attach this block device, all other devices passed in the config have been attached at this point
-			if err := c.sandbox.devManager.AttachDevice(m.BlockDeviceID, c.sandbox); err != nil {
-				return nil, err
-			}
+			c.Logger().WithFields(logrus.Fields{
+				"mount": m,
+			}).Info("Skipping mount associated with block")
 
-			if err := c.sandbox.storeSandboxDevices(); err != nil {
-				//TODO: roll back?
-				return nil, err
-			}
 			continue
 		}
 
@@ -615,11 +610,13 @@ func newContainer(sandbox *Sandbox, contConfig ContainerConfig) (*Container, err
 
 			// Check if mount is a block device file. If it is, the block device will be attached to the host
 			// instead of passing this as a shared mount.
+
 			if c.checkBlockDeviceSupport() && stat.Mode&unix.S_IFBLK == unix.S_IFBLK {
 
 				//scenarios, this *may* still be the correct flow.  Review this for FC.
 				hypervisorCaps := c.sandbox.hypervisor.capabilities()
-				if hypervisorCaps.isBlockDeviceHotplugSupported() {
+				if hypervisorCaps.isBlockDeviceHotplugSupported() ||
+					!hypervisorCaps.isBlockDeviceHotplugSupported() { // Adding this hacky case for FC.
 
 					b, err := c.sandbox.devManager.NewDevice(config.DeviceInfo{
 						HostPath:      m.Source,
@@ -743,6 +740,20 @@ func createContainer(sandbox *Sandbox, contConfig ContainerConfig) (c *Container
 	// Attach devices
 	if err = c.attachDevices(); err != nil {
 		return
+	}
+
+	// Add all Volumes that have been identified as block now, after the container rootfs and devices have been attached.
+	for i, m := range c.mounts {
+		if len(m.BlockDeviceID) > 0 {
+			if err := c.sandbox.devManager.AttachDevice(c.mounts[i].BlockDeviceID, c.sandbox); err != nil {
+				return nil, err
+			}
+
+			if err := c.sandbox.storeSandboxDevices(); err != nil {
+				//TODO: roll back?
+				return nil, err
+			}
+		}
 	}
 
 	// Add CPU and Memory per container request
