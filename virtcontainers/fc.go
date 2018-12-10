@@ -182,10 +182,17 @@ func (fc *firecracker) fcInit(fcSocket string) error {
 	//TODO: It take time for the process to respond
 	//Need to see if firecracker can accept a precreated socket
 	//or we need to wait for it respond back by examining stdout
-	time.Sleep(1000 * time.Millisecond)
 
 	fc.firecrackerd = cmd
 	fc.client = fc.newFireClient("/tmp/" + fcSocket)
+
+	for {
+		_, err := fc.client.Operations.DescribeInstance(nil)
+		if err == nil {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	if err != nil {
 		fc.Logger().WithField("fcInit failed:", err).Debug()
