@@ -13,6 +13,7 @@ import (
 
 	//"path/filepath"
 	//"strconv"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,6 +68,12 @@ func (s *firecrackerState) set(state vmmState) {
 
 	s.state = state
 }
+
+// This indicates the number of block devices that can be attached to the
+// firecracker guest VM.
+// We attach a pool of placeholder drives before the guest has started, and then
+// patch the replace placeholder drives with drives with actual contents.
+const fcDiskPoolSize = 8
 
 // firecracker is an Hypervisor interface implementation for the firecracker hypervisor.
 type firecracker struct {
@@ -316,9 +323,44 @@ func (fc *firecracker) startSandbox() error {
 	}
 
 	fc.fcSetVMRootfs(image)
+	fc.createDiskPool()
 
 	for _, d := range fc.pendingDevices {
 		if err = fc.addDevice(d.dev, d.devType); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fc *firecracker) createDiskPool() error {
+	span, _ := fc.trace("createDiskPool")
+	defer span.Finish()
+
+	for i := 0; i < fcDiskPoolSize; i++ {
+		driveID := "drive-" + strconv.Itoa(i)
+		driveParams := ops.NewPutGuestDriveByIDParams()
+		driveParams.SetDriveID(driveID)
+		isReadOnly := false
+		isRootDevice := false
+
+		// Create a temporary file as a placeholder backend for the drive
+		hostPath, err := fc.storage.createSandboxTempFile(fc.id)
+		if err != nil {
+			return err
+		}
+
+		drive := &models.Drive{
+			DriveID:      &driveID,
+			IsReadOnly:   &isReadOnly,
+			IsRootDevice: &isRootDevice,
+			PathOnHost:   &hostPath,
+		}
+		driveParams.SetBody(drive)
+		_, err = fc.client.Operations.PutGuestDriveByID(driveParams)
+		if err != nil {
+			fc.Logger().WithField("fcSetVMRootfs failed:", err).Debug()
 			return err
 		}
 	}
@@ -466,7 +508,9 @@ func (fc *firecracker) fcUpdateBlockDrive(drive config.BlockDrive) error {
 	span, _ := fc.trace("fcUpdateBlockDrive")
 	defer span.Finish()
 
-	driveID := drive.ID
+	// Use the global block index as an index into the pool of the devices
+	// created for firecracker.
+	driveID := "drive-" + strconv.Itoa(drive.Index)
 	driveParams := ops.NewPatchGuestDriveByIDParams()
 	driveParams.SetDriveID(driveID)
 
@@ -540,7 +584,7 @@ func (fc *firecracker) hotplugAddDevice(devInfo interface{}, devType deviceType)
 
 	switch devType {
 	case blockDev:
-		return nil, fc.fcAddBlockDrive(*devInfo.(*config.BlockDrive))
+		return nil, fc.fcUpdateBlockDrive(*devInfo.(*config.BlockDrive))
 	default:
 		fc.Logger().WithField("devInfo", devInfo).Warn("hotplugAddDevce: unknown device")
 		fc.Logger().WithField("devType:", devType).Warn("hotplugAddDevce: unknown device")
