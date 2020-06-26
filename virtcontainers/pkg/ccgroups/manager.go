@@ -3,20 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 
-package cgroups
+package ccgroups
 
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
 	"github.com/kata-containers/runtime/virtcontainers/pkg/rootless"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -82,75 +80,93 @@ func V1HostCgroupSubsystems() ([]cgroups.Subsystem, error) {
 	return cgroupsSubsystems(subsystems)
 }
 
-func isSystemd() bool {
-	return false
+func isSystemd(cg_path string) bool {
+	return strings.HasSuffix(path.Base(cg_path), ".slice")
 }
 
 // New: create the cgroup.
-func New() (*Manager, error) {
-
+func New(cgroupPath string) error {
 	var (
-		cg  cgroups.Cgroup
-		cg2 *cgroupsv2.Manager
+		hier cgroups.Hierarchy
+		path cgroups.Path
 	)
 
-	path := ""
-
-	// V2 or V1?
-	if cgroups.Mode() == cgroups.Unified {
-		// we are working with a v2 manager
-		cg2, err := cgroupsv2.NewManager("/sys/fs/cgroup", path, &cgroupsv2.Resources{})
-		if err != nil {
-			return nil, err
-		}
-		defer cg2.Delete()
+	if isSystemd(cgroupPath) {
+		hier = SystemdHostCgroupSubsystems
+		path = cgroups.Slice("", cgroupPath)
 	} else {
-		if isSystemd() {
-			cg, _ = cgroups.New(SystemdHostCgroupSubsystems, cgroups.StaticPath(path), &specs.LinuxResources{})
-		} else {
-			cg, _ = cgroups.New(V1HostCgroupSubsystems, cgroups.StaticPath(path), &specs.LinuxResources{})
-		}
-
-		cg.Update(nil)
+		hier = V1HostCgroupSubsystems
+		path = cgroups.StaticPath(cgroupPath)
 	}
 
-	return nil, nil
+	_, err := cgroups.New(hier, path, &specs.LinuxResources{})
+	return err
 }
 
-// read all the pids in cgroupPath
-func readPids(cgroupPath string) ([]int, error) {
-	pids := []int{}
-	f, err := os.Open(filepath.Join(cgroupPath, cgroupProcs))
+func DeleteCgroup(cgroupPath string) error {
+	var hier cgroups.Hierarchy
+	var path cgroups.Path
+
+	if isSystemd(cgroupPath) {
+		hier = SystemdHostCgroupSubsystems
+		path = cgroups.Slice("", cgroupPath)
+	} else {
+		hier = V1HostCgroupSubsystems
+		path = cgroups.StaticPath(cgroupPath)
+	}
+
+	cg, err := cgroups.Load(hier, path)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer f.Close()
-	buf := bufio.NewScanner(f)
 
-	for buf.Scan() {
-		if t := buf.Text(); t != "" {
-			pid, err := strconv.Atoi(t)
-			if err != nil {
-				return nil, err
-			}
-			pids = append(pids, pid)
-		}
-	}
-	return pids, nil
+	return cg.Delete()
 }
 
-// write the pids into cgroup.procs
-func writePids(pids []int, cgroupPath string) error {
-	cgroupProcsPath := filepath.Join(cgroupPath, cgroupProcs)
-	for _, pid := range pids {
-		if err := ioutil.WriteFile(cgroupProcsPath,
-			[]byte(strconv.Itoa(pid)),
-			os.FileMode(0),
-		); err != nil {
-			return err
-		}
+// Load: get the cgroup
+func UpdateCpuset(cpuset, memset, cgroupPath string) error {
+	var hier cgroups.Hierarchy
+
+	if isSystemd(cgroupPath) {
+		hier = SystemdHostCgroupSubsystems
+	} else {
+		hier = V1HostCgroupSubsystems
 	}
-	return nil
+
+	// Load the path:
+	cg, err := cgroups.Load(hier, cgroups.StaticPath(cgroupPath))
+	if err != nil {
+		return err
+	}
+
+	resource := &specs.LinuxResources{
+		CPU: &specs.LinuxCPU{
+			Cpus: cpuset,
+			Mems: memset,
+		},
+	}
+
+	return cg.Update(resource)
+}
+
+func AddDevice(device, cgroupPath string) error {
+	var hier cgroups.Hierarchy
+
+	if isSystemd(cgroupPath) {
+		hier = SystemdHostCgroupSubsystems
+	} else {
+		hier = V1HostCgroupSubsystems
+	}
+
+	// Load the path:
+	cg, err := cgroups.Load(hier, cgroups.StaticPath(cgroupPath))
+	if err != nil {
+		return err
+	}
+
+	resource := &specs.LinuxResources{}
+	return cg.Update(resource)
+
 }
 
 func (m *Manager) logger() *logrus.Entry {
