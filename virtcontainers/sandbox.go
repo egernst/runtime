@@ -1929,9 +1929,20 @@ func (s *Sandbox) GetHypervisorType() string {
 func (s *Sandbox) cgroupsUpdate() error {
 
 	// If Kata is configured for SandboxCgroupOnly, the VMM and its processes are already
-	// in the Kata sandbox cgroup (inherited). No need to move threads/processes, and we should
-	// rely on parent's cgroup CPU/memory values
+	// in the Kata sandbox cgroup (inherited). Check to see if sandbox cpuset needs to be
+	// updated.
 	if s.config.SandboxCgroupOnly {
+		cpuset, err := s.getSandboxCpuSet()
+		if err != nil {
+			return err
+		}
+
+		if cpuset != "" {
+			if err := s.cgroupMgr.UpdateCpuSets(cpuset); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	}
 
