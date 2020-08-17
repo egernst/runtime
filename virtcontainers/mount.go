@@ -273,7 +273,7 @@ func remount(ctx context.Context, mountflags uintptr, src string) error {
 	return nil
 }
 
-// bindMountContainerRootfs bind mounts a container rootfs into a 9pfs shared
+// bindMountContainerRootfs bind mounts a container rootfs into a virtio-fs/9pfs shared
 // directory between the guest and the host.
 func bindMountContainerRootfs(ctx context.Context, shareDir, cid, cRootFs string, readonly bool) error {
 	span, _ := trace(ctx, "bindMountContainerRootfs")

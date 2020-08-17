@@ -1299,7 +1299,7 @@ func (k *kataAgent) buildContainerRootfs(sandbox *Sandbox, c *Container, rootPat
 		// The rootfs storage volume represents the container rootfs
 		// mount point inside the guest.
 		// It can be a block based device (when using block based container
-		// overlay on the host) mount or a 9pfs one (for all other overlay
+		// overlay on the host) mount or a virtio-fs/9pfs one (for all other overlay
 		// implementations).
 		rootfs := &grpc.Storage{}
 
@@ -1355,14 +1355,10 @@ func (k *kataAgent) buildContainerRootfs(sandbox *Sandbox, c *Container, rootPat
 		return rootfs, nil
 	}
 
-	// This is not a block based device rootfs.
-	// We are going to bind mount it into the 9pfs
-	// shared drive between the host and the guest.
-	// With 9pfs we don't need to ask the agent to
-	// mount the rootfs as the shared directory
-	// (kataGuestSharedDir) is already mounted in the
-	// guest. We only need to mount the rootfs from
-	// the host and it will show up in the guest.
+	// This is not a block based device rootfs. We are going to bind mount it into the shared
+	// drive between the host and the guest. With virtio-fs/9pfs we don't need to ask the agent to
+	// mount the rootfs as the shared directory (kataGuestSharedDir) is already mounted in the
+	// guest. We only need to mount the rootfs from the host and it will show up in the guest.
 	if err := bindMountContainerRootfs(k.ctx, getMountPath(sandbox.id), c.id, c.rootFs.Target, false); err != nil {
 		return nil, err
 	}
